@@ -109,6 +109,8 @@ do_libc() {
 
     [ "${CT_LIBC_NEWLIB_ENABLE_TARGET_OPTSPACE}" = "y" ] && newlib_opts+=("--enable-target-optspace")
 
+    [ "${CT_THREADS_NONE}" = "y" ] && newlib_opts+=("--enable-newlib-multithread=no")
+
     # Note: newlib handles the build/host/target a little bit differently
     # than one would expect:
     #   build  : not used
