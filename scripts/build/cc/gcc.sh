@@ -249,6 +249,12 @@ do_cc_core_backend() {
         extra_config+=("--enable-cxx-flags=${CT_CC_ENABLE_CXX_FLAGS}")
     fi
 
+    if [ "${CT_CC_GCC_4_8_or_later}" = "y" ]; then
+        if [ "${CT_THREADS}" = "none" ]; then
+            extra_config+=(--disable-libatomic)
+        fi
+    fi
+
     core_LDFLAGS+=("${ldflags}")
 
     # *** WARNING ! ***
