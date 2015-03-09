@@ -226,7 +226,7 @@ do_cc_core_backend() {
 
     if [ "${CT_CC_GCC_HAS_PKGVERSION_BUGURL}" = "y" ]; then
         # Bare metal delivers the core compiler as final compiler, so add version info and bugurl
-        extra_config+=("--with-pkgversion=${CT_PKGVERSION}")
+        extra_config+=("--with-pkgversion='${CT_PKGVERSION}'")
         [ -n "${CT_TOOLCHAIN_BUGURL}" ] && extra_config+=("--with-bugurl=${CT_TOOLCHAIN_BUGURL}")
     fi
 
@@ -636,7 +636,7 @@ do_cc_backend() {
 
     [ "${CT_SHARED_LIBS}" = "y" ] || extra_config+=("--disable-shared")
     if [ "${CT_CC_GCC_HAS_PKGVERSION_BUGURL}" = "y" ]; then
-        extra_config+=("--with-pkgversion=${CT_PKGVERSION}")
+        extra_config+=("--with-pkgversion='${CT_PKGVERSION}'")
         [ -n "${CT_TOOLCHAIN_BUGURL}" ] && extra_config+=("--with-bugurl=${CT_TOOLCHAIN_BUGURL}")
     fi
     case "${CT_CC_GCC_SJLJ_EXCEPTIONS}" in
