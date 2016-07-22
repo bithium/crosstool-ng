@@ -6,6 +6,10 @@ do_cloog_get() { :; }
 do_cloog_extract() { :; }
 do_cloog_for_build() { :; }
 do_cloog_for_host() { :; }
+do_cloog_for_target() { :; }
+
+# Overide functions depending on configuration
+if [ "${CT_CLOOG}" = "y" ]; then
 
 cloog_basename() {
     printf "cloog"
@@ -18,13 +22,11 @@ cloog_basename_version() {
     printf -- "-${CT_CLOOG_VERSION}"
 }
 
-# Overide functions depending on configuration
-if [ "${CT_CLOOG}" = "y" ]; then
-
 # Download CLooG
 do_cloog_get() {
     CT_GetFile "$(cloog_basename_version)"          \
-        http://www.bastoul.net/cloog/pages/download
+        http://www.bastoul.net/cloog/pages/download \
+        ftp://gcc.gnu.org/pub/gcc/infrastructure
 }
 
 # Extract CLooG
@@ -140,15 +142,15 @@ do_cloog_backend() {
         "${cloog_opts[@]}"
 
     CT_DoLog EXTRA "Building CLooG"
-    CT_DoExecLog ALL make ${JOBSFLAGS} "${cloog_targets[@]}"
+    CT_DoExecLog ALL ${make} ${JOBSFLAGS} "${cloog_targets[@]}"
 
     if [ "${CT_COMPLIBS_CHECK}" = "y" ]; then
         CT_DoLog EXTRA "Checking CLooG"
-        CT_DoExecLog ALL make ${JOBSFLAGS} -s check
+        CT_DoExecLog ALL ${make} ${JOBSFLAGS} -s check
     fi
 
     CT_DoLog EXTRA "Installing CLooG"
-    CT_DoExecLog ALL make "${cloog_install_targets[@]}"
+    CT_DoExecLog ALL ${make} "${cloog_install_targets[@]}"
 }
 
 fi # CT_CLOOG
