@@ -19,8 +19,8 @@ fi
 # Download uClibc
 do_libc_get() {
     if [ "${CT_LIBC_UCLIBC_CUSTOM}" = "y" ]; then
-        CT_GetCustom "${uclibc_name}" "${CT_LIBC_VERSION}" \
-                     "${CT_LIBC_UCLIBC_CUSTOM_LOCATION}"
+        CT_GetCustom "${uclibc_name}" "${CT_LIBC_UCLIBC_CUSTOM_VERSION}" \
+            "${CT_LIBC_UCLIBC_CUSTOM_LOCATION}"
     else
         CT_GetFile "${uclibc_name}-${CT_LIBC_VERSION}" ${libc_src}
     fi
@@ -34,16 +34,8 @@ do_libc_get() {
 
 # Extract uClibc
 do_libc_extract() {
-    # If not using custom directory location, extract and patch
-    # Note: we do the inverse test we do in other components,
-    # because here we still need to extract the locales, even for
-    # custom location directory. Just use negate the whole test,
-    # to keep it the same as for other components.
-    if ! [ "${CT_LIBC_UCLIBC_CUSTOM}" = "y" \
-         -a -d "${CT_SRC_DIR}/${uclibc_name}-${CT_LIBC_VERSION}" ]; then
-        CT_Extract "${uclibc_name}-${CT_LIBC_VERSION}"
-        CT_Patch "${uclibc_name}" "${CT_LIBC_VERSION}"
-    fi
+    CT_Extract "${uclibc_name}-${CT_LIBC_VERSION}"
+    CT_Patch "${uclibc_name}" "${CT_LIBC_VERSION}"
 
     # uClibc locales
     # Extracting pregen locales ourselves is kinda
@@ -260,7 +252,6 @@ manage_uClibc_config() {
         x86:32)      arch=i386;;
         x86:64)      arch=x86_64;;
         sh:32)       arch="sh";;
-        sh:64)       arch="sh64";;
         *)           arch="${CT_ARCH}";;
     esac
     # Also remove stripping: its the responsibility of the
@@ -426,6 +417,13 @@ manage_uClibc_config() {
         CT_KconfigEnableOption "UCLIBC_HAS_WCHAR" "${dst}"
     else
         CT_KconfigDisableOption "UCLIBC_HAS_WCHAR" "${dst}"
+    fi
+
+    # IPv6 support
+    if [ "${CT_LIBC_UCLIBC_IPV6}" = "y" ]; then
+        CT_KconfigEnableOption "UCLIBC_HAS_IPV6" "${dst}"
+    else
+        CT_KconfigDisableOption "UCLIBC_HAS_IPV6" "${dst}"
     fi
 
     # Force on options needed for C++ if we'll be making a C++ compiler.

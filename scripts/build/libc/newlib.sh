@@ -14,8 +14,8 @@ do_libc_get() {
                      ftp://sourceware.org/pub/newlib}"
 
     if [ "${CT_LIBC_NEWLIB_CUSTOM}" = "y" ]; then
-        CT_GetCustom "newlib" "${CT_LIBC_VERSION}"      \
-                     "${CT_LIBC_NEWLIB_CUSTOM_LOCATION}"
+        CT_GetCustom "newlib" "${CT_LIBC_NEWLIB_CUSTOM_VERSION}" \
+            "${CT_LIBC_NEWLIB_CUSTOM_LOCATION}"
     else # ! custom location
         if echo ${CT_LIBC_VERSION} |${grep} -q linaro; then
             YYMM=`echo ${CT_LIBC_VERSION} |cut -d- -f3 |${sed} -e 's,^..,,'`
@@ -31,12 +31,6 @@ do_libc_get() {
 }
 
 do_libc_extract() {
-    # If using custom directory location, nothing to do
-    if [    "${CT_LIBC_NEWLIB_CUSTOM}" = "y"             \
-         -a -d "${CT_SRC_DIR}/newlib-${CT_LIBC_VERSION}" ]; then
-        return 0
-    fi
-
     CT_Extract "newlib-${CT_LIBC_VERSION}"
     CT_Patch "newlib" "${CT_LIBC_VERSION}"
 
@@ -72,6 +66,11 @@ do_libc() {
 
     CT_DoLog EXTRA "Configuring C library"
 
+    # Multilib is the default, so if it is not enabled, disable it.
+    if [ "${CT_MULTILIB}" != "y" ]; then
+        extra_config+=("--disable-multilib")
+    fi
+
     if [ "${CT_LIBC_NEWLIB_IO_C99FMT}" = "y" ]; then
         newlib_opts+=( "--enable-newlib-io-c99-formats" )
     else
@@ -97,6 +96,12 @@ do_libc() {
         newlib_opts+=( "--disable-newlib-supplied-syscalls" )
     else
         newlib_opts+=( "--enable-newlib-supplied-syscalls" )
+    fi
+    if [ "${CT_LIBC_NEWLIB_NANO_MALLOC}" = "y" ]; then
+        newlib_opts+=( "--enable-newlib-nano-malloc" )
+    fi
+    if [ "${CT_LIBC_NEWLIB_NANO_FORMATTED_IO}" = "y" ]; then
+        newlib_opts+=( "--enable-newlib-nano-formatted-io" )
     fi
 
     [ "${CT_LIBC_NEWLIB_ENABLE_TARGET_OPTSPACE}" = "y" ] && newlib_opts+=("--enable-target-optspace")

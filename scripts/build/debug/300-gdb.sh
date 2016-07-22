@@ -7,7 +7,8 @@ do_debug_gdb_get() {
     local linaro_series=""
 
     if [ "${CT_GDB_CUSTOM}" = "y" ]; then
-        CT_GetCustom "gdb" "${CT_GDB_VERSION}" "${CT_GDB_CUSTOM_LOCATION}"
+        CT_GetCustom "gdb" "${CT_GDB_CUSTOM_VERSION}" \
+            "${CT_GDB_CUSTOM_LOCATION}"
     else
         # Account for the Linaro versioning
         linaro_version="$( echo "${CT_GDB_VERSION}"      \
@@ -33,12 +34,6 @@ do_debug_gdb_get() {
 }
 
 do_debug_gdb_extract() {
-    # If using custom directory location, nothing to do
-    if [    "${CT_GDB_CUSTOM}" = "y" \
-         -a -d "${CT_SRC_DIR}/gdb-${CT_GDB_VERSION}" ]; then
-        return 0
-    fi
-
     CT_Extract "gdb-${CT_GDB_VERSION}"
     CT_Patch "gdb" "${CT_GDB_VERSION}"
 
@@ -74,7 +69,11 @@ do_debug_gdb_build() {
 
         cross_extra_config=("${extra_config[@]}")
         cross_extra_config+=("--with-expat")
-        cross_extra_config+=("--with-libexpat-prefix=${CT_HOST_COMPLIBS_DIR}")
+        # NOTE: DO NOT USE --with-libexpat-prefix (until GDB configure is smarter)!!!
+        # It conflicts with a static build: GDB's configure script will find the shared
+        # version of expat and will attempt to link that, despite the -static flag.
+        # The link will fail, and configure will abort with "expat missing or unusable"
+        # message.
         case "${CT_THREADS}" in
             none)   cross_extra_config+=("--disable-threads");;
             *)      cross_extra_config+=("--enable-threads");;
@@ -93,12 +92,24 @@ do_debug_gdb_build() {
             cross_extra_config+=("--disable-nls")
         fi
 
-        CC_for_gdb=
-        LD_for_gdb=
+        CC_for_gdb="${CT_HOST}-gcc ${CT_CFLAGS_FOR_HOST} ${CT_LDFLAGS_FOR_HOST}"
+        LD_for_gdb="${CT_HOST}-ld ${CT_LDFLAGS_FOR_HOST}"
         if [ "${CT_GDB_CROSS_STATIC}" = "y" ]; then
-            CC_for_gdb="${CT_HOST}-gcc -static"
-            LD_for_gdb="${CT_HOST}-ld -static"
+            CC_for_gdb+=" -static"
+            LD_for_gdb+=" -static"
         fi
+
+        # Fix up whitespace. Some older GDB releases (e.g. 6.8a) get confused if there
+        # are multiple consecutive spaces: sub-configure scripts replace them with a
+        # single space and then complain that $CC value changed from that in
+        # the master directory.
+        CC_for_gdb=`echo $CC_for_gdb`
+        LD_for_gdb=`echo $LD_for_gdb`
+
+        # Disable binutils options when building from the binutils-gdb repo.
+        cross_extra_config+=("--disable-binutils")
+        cross_extra_config+=("--disable-ld")
+        cross_extra_config+=("--disable-gas")
 
         CT_DoLog DEBUG "Extra config passed: '${cross_extra_config[*]}'"
 
@@ -162,6 +173,11 @@ do_debug_gdb_build() {
         fi
 
         native_extra_config+=("--with-expat")
+        # NOTE: DO NOT USE --with-libexpat-prefix (until GDB configure is smarter)!!!
+        # It conflicts with a static build: GDB's configure script will find the shared
+        # version of expat and will attempt to link that, despite the -static flag.
+        # The link will fail, and configure will abort with "expat missing or unusable"
+        # message.
 
         CT_DoLog EXTRA "Configuring native gdb"
 
@@ -185,6 +201,11 @@ do_debug_gdb_build() {
         fi
 
         export ac_cv_func_strncmp_works=yes
+
+        # Disable binutils options when building from the binutils-gdb repo.
+        native_extra_config+=("--disable-binutils")
+        native_extra_config+=("--disable-ld")
+        native_extra_config+=("--disable-gas")
 
         CT_DoLog DEBUG "Extra config passed: '${native_extra_config[*]}'"
 
@@ -250,6 +271,11 @@ do_debug_gdb_build() {
                 gdbserver_extra_config+=( --disable-inprocess-agent )
             fi
         fi
+
+        # Disable binutils options when building from the binutils-gdb repo.
+        gdbserver_extra_config+=("--disable-binutils")
+        gdbserver_extra_config+=("--disable-ld")
+        gdbserver_extra_config+=("--disable-gas")
 
         CT_DoExecLog CFG                                \
         CC="${CT_TARGET}-gcc"                           \
