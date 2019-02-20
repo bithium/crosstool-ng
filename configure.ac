@@ -3,11 +3,9 @@
 
 AC_PREREQ([2.67])
 
-# FIXME Temporary hack until the next release (we'll switch to plain numeric tags then)
-# FIXME need to quote sed expression
 AC_INIT(
     [crosstool-NG],
-    [m4_esyscmd_s([git describe --always --dirty | sed s,^crosstool-ng-,,])],
+    [m4_esyscmd_s([maintainer/git-version-gen --prefix crosstool-ng- .tarball-version])],
     [crossgcc@sourceware.org],
     [crosstool-ng],
     [http://crosstool-ng.org])
@@ -20,6 +18,9 @@ AC_CONFIG_MACRO_DIR([m4])
 # - Object files are generated in a subdirectory (new default in automake)
 # - Request new tar format (old, tar-v7, breaks on long paths we have)
 AM_INIT_AUTOMAKE([-Wall -Werror foreign no-dist-gzip dist-xz dist-bzip2 subdir-objects tar-pax])
+
+# To avoid stubbing autotools with missing script
+AM_MAINTAINER_MODE([enable])
 
 # Safety check per autoconf best practices
 AC_CONFIG_SRCDIR([ct-ng.in])
@@ -80,13 +81,15 @@ CTNG_PROG_VERSION_REQ_STRICT([SED],
     [GNU sed >= 4.0],
     [sed],
     [gsed sed],
-    ['GNU sed[^0-9]* [4-9]\.'])
+    [GNU sed[^0-9]* [4-9]\.])
 AC_ARG_VAR([SED], [Specify the full path to GNU sed])
 
 AC_CONFIG_HEADERS([config.h])
 
 # Modern GCC/GDB releases require C++ support in the compiler
 AC_PROG_CC
+# Add for legacy reasons (automake < 1.14)
+AM_PROG_CC_C_O
 AC_PROG_CXX
 AC_PROG_CPP
 AC_PROG_LEX
@@ -110,8 +113,8 @@ AC_PROG_RANLIB
 CTNG_PATH_TOOL_REQ([OBJCOPY], [gobjcopy objcopy], [objcopy])
 CTNG_PATH_TOOL_REQ([OBJDUMP], [gobjdump objdump], [objdump])
 CTNG_PATH_TOOL_REQ([READELF], [greadelf readelf], [readelf])
+CTNG_PATH_TOOL_REQ([BISON], [bison], [bison])
 
-CTNG_CHECK_PROGS_REQ([bison], [bison])
 CTNG_CHECK_PROGS_REQ([flex], [flex])
 CTNG_CHECK_PROGS_REQ([makeinfo], [makeinfo])
 CTNG_CHECK_PROGS_REQ([cut], [cut])
@@ -119,8 +122,12 @@ CTNG_CHECK_PROGS_REQ([readlink], [readlink])
 CTNG_CHECK_PROGS_REQ([tar], [tar])
 CTNG_CHECK_PROGS_REQ([gzip], [gzip])
 CTNG_CHECK_PROGS_REQ([bzip2], [bzip2])
+CTNG_CHECK_PROGS_REQ([lzip], [lzip])
 CTNG_CHECK_PROGS_REQ([xz], [xz])
+CTNG_CHECK_PROGS_REQ([unzip], [unzip])
 CTNG_CHECK_PROGS_REQ([help2man], [help2man])
+CTNG_CHECK_PROGS_REQ([file], [file])
+CTNG_CHECK_PROGS_REQ([which], [which])
 
 # Not a fatal failure even if we have neither - the tarballs may
 # be provided in a local directory.
@@ -132,8 +139,6 @@ AC_CHECK_PROGS([curl], [curl])
 CTNG_SET_KCONFIG_OPTION([curl])
 AC_SUBST([curl])
 
-CTNG_PROG_STAT
-
 CTNG_CPU_COUNT
 
 CTNG_PATH_TOOL_REQ([PATCH], [gpatch patch], [patch])
@@ -143,14 +148,14 @@ CTNG_PROG_VERSION_REQ_STRICT([BASH_SHELL],
     [GNU bash >= 3.1],
     [bash],
     [bash],
-    ['^GNU bash, version (3\.[1-9]|4)'])
+    [^GNU bash, version (3\.[1-9]|4|5)])
 
 # We need a awk that *is* GNU awk
 CTNG_PROG_VERSION_REQ_STRICT([AWK],
     [GNU awk],
     [awk],
     [gawk awk],
-    ['^GNU Awk '])
+    [^GNU Awk ])
 
 # FIXME This checks for tools at the time configure runs. If a tool is later updated
 # to satisfy our version requirement, we still won't be able to see that. Or worse,
@@ -163,53 +168,56 @@ CTNG_PROG_VERSION_REQ_ANY([MAKE],
     [GNU make >= 3.81],
     [make],
     [gmake make],
-    ['^GNU Make (3\.8[1-9]|3\.9[0-9]|[4-9]\.)'],
+    [^GNU Make (3\.8[1-9]|3\.9[0-9]|[4-9]\.)],
     [make_3_81_or_newer])
 
 # Check other companion tools that we may or may not build.
-CTNG_PROG_VERSION_REQ_STRICT([LIBTOOL],
+CTNG_PROG_VERSION_REQ_ANY([LIBTOOL],
     [GNU libtool >= 2.4],
     [libtool],
     [glibtool libtool],
-    ['\(GNU libtool\) ([3-9]\.|2.[4-9]|2.[1-3][0-9])'],
+    [\(GNU libtool\) ([3-9]\.|2.[4-9]|2.[1-3][0-9])],
     [libtool_2_4_or_newer])
 
-CTNG_PROG_VERSION([LIBTOOLIZE],
+CTNG_PROG_VERSION_REQ_ANY([LIBTOOLIZE],
     [GNU libtoolize >= 2.4],
     [libtoolize],
     [glibtoolize libtoolize],
-    ['\(GNU libtool\) ([3-9]\.|2.[4-9]|2.[1-3][0-9])'],
+    [\(GNU libtool\) ([3-9]\.|2.[4-9]|2.[1-3][0-9])],
     [libtoolize_2_4_or_newer])
 
 CTNG_PROG_VERSION([AUTOCONF],
     [GNU autoconf >= 2.65],
     [autoconf],
     [autoconf],
-    ['\(GNU Autoconf\) ([3-9]\.|2\.[7-9][0-9]|2\.6[5-9])'],
+    [\(GNU Autoconf\) ([3-9]\.|2\.[7-9][0-9]|2\.6[5-9])],
     [autoconf_2_65_or_newer])
 
 CTNG_PROG_VERSION([AUTORECONF],
     [GNU autoreconf >= 2.63],
     [autoreconf],
     [autoreconf],
-    ['\(GNU Autoconf\) ([3-9]\.|2\.[7-9][0-9]|2\.6[5-9])'],
+    [\(GNU Autoconf\) ([3-9]\.|2\.[7-9][0-9]|2\.6[5-9])],
     [autoreconf_2_65_or_newer])
 
 CTNG_PROG_VERSION([AUTOMAKE],
     [GNU automake >= 1.15],
     [automake],
     [automake],
-    ['\(GNU automake\) ([2-9]\.|1\.[2-9][0-9]|1\.1[5-9])'],
+    [\(GNU automake\) ([2-9]\.|1\.[2-9][0-9]|1\.1[5-9])],
     [automake_1_15_or_newer])
 
 CTNG_PROG_VERSION([M4],
     [GNU m4 >= 1.4.12],
     [m4],
     [gm4 m4],
-    ['\(GNU M4\) ([2-9]\.|1\.[5-9]|1\.[1-4][0-9]|1\.4\.[2-9][0-9]|1\.4\.1[2-9])'],
+    [\(GNU M4\) ([2-9]\.|1\.[5-9]|1\.[1-4][0-9]|1\.4\.[2-9][0-9]|1\.4\.1[2-9])],
     [gnu_m4_1_4_12_or_newer])
 
 AC_SUBST([kconfig_options])
+
+AC_CHECK_PROGS([dtc], [dtc])
+CTNG_SET_KCONFIG_OPTION([dtc])
 
 AC_CHECK_PROGS([cvs], [cvs])
 CTNG_SET_KCONFIG_OPTION([cvs])
@@ -219,6 +227,16 @@ CTNG_SET_KCONFIG_OPTION([svn])
 
 AC_CHECK_PROGS([git], [git])
 CTNG_SET_KCONFIG_OPTION([git])
+
+# Check which tools we have for verifying the digest
+AC_PATH_PROGS([md5sum], [gmd5sum md5sum])
+AC_PATH_PROGS([sha1sum], [gsha1sum sha1sum])
+AC_PATH_PROGS([sha256sum], [gsha256sum sha256sum])
+AC_PATH_PROGS([sha512sum], [gsha512sum sha512sum])
+CTNG_SET_KCONFIG_OPTION([md5sum])
+CTNG_SET_KCONFIG_OPTION([sha1sum])
+CTNG_SET_KCONFIG_OPTION([sha256sum])
+CTNG_SET_KCONFIG_OPTION([sha512sum])
 
 # FIXME why checking if not using the result? We don't provide replacemant malloc/alloca/...
 AC_C_INLINE
@@ -283,12 +301,6 @@ AC_SUBST([DATE])
 AM_CONDITIONAL([INSTALL_USER_MANUAL], [test ! -f "${srcdir}/docs/MANUAL_ONLINE"])
 AC_MSG_CHECKING([if the manual needs to be installed])
 AM_COND_IF([INSTALL_USER_MANUAL], [AC_MSG_RESULT([yes])], [AC_MSG_RESULT([no])])
-
-# FIXME Retire? We don't want to debug a version that has been mislabeled by a user
-# Decorate the version string per user-supplied version.sh, if any
-AS_IF(
-    [test -f version.sh -a -x version.sh],
-    [PACKAGE_VERSION=$(./version.sh "${PACKAGE_VERSION}")])
 
 AC_CONFIG_FILES([
     Makefile

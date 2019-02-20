@@ -5,15 +5,8 @@
 # Edited by Martin Lund <mgl@doredevelopment.dk>
 #
 
-do_libc_get() {
-    CT_Fetch NEWLIB
-}
-
-do_libc_extract() {
-    CT_ExtractPatch NEWLIB
-}
-
-do_libc_start_files() {
+newlib_start_files()
+{
     CT_DoStep INFO "Installing C library headers & start files"
     CT_DoExecLog ALL cp -a "${CT_SRC_DIR}/newlib/newlib/libc/include/." \
     "${CT_HEADERS_DIR}"
@@ -25,20 +18,20 @@ do_libc_start_files() {
     CT_EndStep
 }
 
-do_libc() {
+newlib_main()
+{
     local -a newlib_opts
     local cflags_for_target
 
     CT_DoStep INFO "Installing C library"
 
-    mkdir -p "${CT_BUILD_DIR}/build-libc"
-    cd "${CT_BUILD_DIR}/build-libc"
+    CT_mkdir_pushd "${CT_BUILD_DIR}/build-libc"
 
     CT_DoLog EXTRA "Configuring C library"
 
     # Multilib is the default, so if it is not enabled, disable it.
     if [ "${CT_MULTILIB}" != "y" ]; then
-        extra_config+=("--disable-multilib")
+        newlib_opts+=("--disable-multilib")
     fi
 
     if [ "${CT_LIBC_NEWLIB_IO_FLOAT}" = "y" ]; then
@@ -65,13 +58,13 @@ IO_LL:newlib-io-long-long
 NEWLIB_REGISTER_FINI:newlib-register-fini
 NANO_MALLOC:newlib-nano-malloc
 NANO_FORMATTED_IO:newlib-nano-formatted-io
-ATEXIT_DYNAMIC_ALLOC:atexit-dynamic-alloc
+ATEXIT_DYNAMIC_ALLOC:newlib-atexit-dynamic-alloc
 GLOBAL_ATEXIT:newlib-global-atexit
 LITE_EXIT:lite-exit
-REENT_SMALL:reent-small
-MULTITHREAD:multithread
+REENT_SMALL:newlib-reent-small
+MULTITHREAD:newlib-multithread
 WIDE_ORIENT:newlib-wide-orient
-UNBUF_STREAM_OPT:unbuf-stream-opt
+UNBUF_STREAM_OPT:newlib-unbuf-stream-opt
 ENABLE_TARGET_OPTSPACE:target-optspace
     "
 
@@ -94,7 +87,7 @@ ENABLE_TARGET_OPTSPACE:target-optspace
     [ "${CT_LIBC_NEWLIB_LTO}" = "y" ] && \
         CT_LIBC_NEWLIB_TARGET_CFLAGS="${CT_LIBC_NEWLIB_TARGET_CFLAGS} -flto"
 
-    cflags_for_target="${CT_TARGET_CFLAGS} ${CT_LIBC_NEWLIB_TARGET_CFLAGS}"
+    cflags_for_target="${CT_ALL_TARGET_CFLAGS} ${CT_LIBC_NEWLIB_TARGET_CFLAGS}"
 
     # Note: newlib handles the build/host/target a little bit differently
     # than one would expect:
@@ -135,9 +128,6 @@ ENABLE_TARGET_OPTSPACE:target-optspace
                                 "${CT_PREFIX_DIR}/share/doc/newlib"
     fi
 
+    CT_Popd
     CT_EndStep
-}
-
-do_libc_post_cc() {
-    :
 }

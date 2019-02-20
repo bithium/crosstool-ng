@@ -19,15 +19,32 @@ usage()
     cat >&2 <<EOF
 ${1:+ERROR :: $1
 
-}Usage: $0 [action] [containters]
+}Usage: $0 [action] [containter] [args...]
 
 Action is one of:
 
    build     Build or rebuild the specified containers.
+   install   Install crosstool-NG in specified containers.
+   sample    Build a sample or if no sample name specified, all.
+   enter     Spawn a shell in the specified container.
+   root      Spawn a root shell in the specified container.
+   clean     Clean up in the specified container.
 
-If containers are not specified, the action is applied to all available containers.
+If a special container name 'all' is used, the action is performed
+on all the containers.
 EOF
     exit 1
+}
+
+do_cleanup()
+{
+    local d
+
+    for d in "$@"; do
+        [ -d "$d" ] || continue
+        chmod -R a+w "$d"
+        rm -rf "$d"
+    done
 }
 
 # Build a docker container, store its ID.
@@ -36,7 +53,8 @@ action_build()
     local cntr=$1
 
     msg "Building Docker container for ${cntr}"
-    docker build -t "ctng-${cntr}" "${cntr}"
+set -x
+    docker build --no-cache -t "ctng-${cntr}" --build-arg CTNG_GID=`id -g` --build-arg CTNG_UID=`id -u` "${cntr}"
 }
 
 # Common backend for enter/test
@@ -44,37 +62,67 @@ _dckr()
 {
     local topdir=`cd ../.. && pwd`
     local cntr=$1
+    local scmd prefix
     shift
 
-    mkdir -p build-${cntr}
-    docker run --rm -i -t \
-        -v `pwd`/common-scripts:/setup-scripts:ro \
+    mkdir -p ${cntr}/{build,install,xtools}
+    prefix="docker run --rm -i -t \
+        -v `pwd`/common-scripts:/common-scripts:ro \
         -v ${topdir}:/crosstool-ng:ro \
-        -v `pwd`/build-${cntr}:/home \
-        -v $HOME/src:/src:ro \
-        ctng-${cntr} \
-        /setup-scripts/su-as-user `id -un` `id -u` `id -gn` `id -g` "$@"
+        -v `pwd`/${cntr}/build:/home/ctng/work \
+        -v `pwd`/${cntr}/install:/opt/ctng \
+        -v `pwd`/${cntr}/xtools:/home/ctng/x-tools \
+        -v $HOME/src:/home/ctng/src:ro \
+        ctng-${cntr}"
+    if [ -n "${AS_ROOT}" ]; then
+        $prefix "$@"
+    elif [ -n "$*" ]; then
+        $prefix su -l ctng -c "$*"
+    else
+        $prefix su -l ctng
+    fi
 }
 
 # Run the test
-action_test()
+action_install()
 {
     local cntr=$1
 
     # The test assumes the top directory is bootstrapped, but clean.
     msg "Setting up crosstool-NG in ${cntr}"
-    _dckr "${cntr}" /setup-scripts/ctng-install
-    msg "Running build-all in ${cntr}"
-    _dckr "${cntr}" /setup-scripts/ctng-test-all
+    do_cleanup ${cntr}/build
+    _dckr "${cntr}" /common-scripts/ctng-install && \
+        _dckr "${cntr}" /common-scripts/ctng-test-basic
+}
+
+# Run the test
+action_sample()
+{
+    local cntr=$1
+    shift
+
+    msg "Building samples in ${cntr} [$@]"
+    do_cleanup ${cntr}/build
+    _dckr "${cntr}" /common-scripts/ctng-build-sample "$@"
 }
 
 # Enter the container using the same user account/environment as for testing.
 action_enter()
 {
     local cntr=$1
+    shift
 
     msg "Entering ${cntr}"
-    _dckr "${cntr}"
+    _dckr "${cntr}" "$@"
+}
+
+# Enter the container using the same user account/environment as for testing.
+action_root()
+{
+    local cntr=$1
+
+    msg "Entering ${cntr} as root"
+    AS_ROOT=y _dckr "${cntr}" /bin/bash
 }
 
 # Clean up after test suite run
@@ -83,18 +131,30 @@ action_clean()
     local cntr=$1
 
     msg "Cleaning up after ${cntr}"
-    rm -rf build-${cntr}
+    do_cleanup ${cntr}/build
 }
 
-action=$1
-shift
+# Clean up after test suite run
+action_distclean()
+{
+    local cntr=$1
+
+    msg "Dist cleaning ${cntr}"
+    do_cleanup ${cntr}/{build,install,xtools}
+}
+
 all_containers=`ls */Dockerfile | sed 's,/Dockerfile,,'`
-selected_containers="${*:-${all_containers}}"
+action=$1
+selected_containers=$2
+shift 2
+if [ "${selected_containers}" = "all" ]; then
+    selected_containers="${all_containers}"
+fi
 
 case "${action}" in
-    build|test|enter|clean)
+    build|install|sample|enter|root|clean|distclean)
         for c in ${selected_containers}; do
-            eval "action_${action} $c"
+            eval "action_${action} ${c} \"$@\""
         done
         ;;
     "")
